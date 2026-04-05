@@ -26,7 +26,9 @@
         <h2>🍎 卡路里紀錄</h2>
         
         <div style="position: relative;">
-            <input type="text" id="foodName" placeholder="搜尋食物名稱..." oninput="searchFood()">
+           <input type="text" id="foodName" list="foodList" oninput="checkFood()" placeholder="食物名稱 (例如: 白飯)">
+<datalist id="foodList">
+    </datalist>
             <div id="suggestions"></div>
         </div>
         <input type="number" id="calories" placeholder="卡路里 (kcal)">
