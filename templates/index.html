@@ -3,34 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🍎 卡路里紀錄助手</title>
+    <title>Keepfit - 卡路里紀錄</title>
     <style>
-        :root { --primary: #28a745; --secondary: #17a2b8; --bg: #f4f7f6; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); padding: 20px; color: #333; }
-        .container { max-width: 500px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h2 { text-align: center; color: #2c3e50; margin-bottom: 25px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; display: flex; justify-content: center; padding: 20px; }
+        .container { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 450px; }
+        h2 { text-align: center; color: #333; margin-bottom: 25px; }
         .input-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9em; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #666; }
         input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
-        .btn-group { display: flex; gap: 10px; margin-top: 20px; }
-        button { flex: 1; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: opacity 0.2s; }
-        .btn-add { background: var(--primary); color: white; width: 100%; margin-top: 10px; font-size: 16px; }
-        .btn-export { background: var(--secondary); color: white; }
-        .btn-import { background: #6c757d; color: white; }
-        button:hover { opacity: 0.9; }
-        table { width: 100%; margin-top: 25px; border-collapse: collapse; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
-        .total-section { margin-top: 20px; text-align: right; font-size: 1.2em; font-weight: bold; color: #d9534f; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.3s; margin-top: 10px; }
+        .btn-add { background-color: #28a745; color: white; }
+        .btn-add:hover { background-color: #218838; }
+        .btn-sync { background-color: #17a2b8; color: white; width: 48%; display: inline-block; }
+        .table-container { margin-top: 25px; border-top: 2px solid #eee; padding-top: 15px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; }
+        .total-section { text-align: right; margin-top: 15px; font-size: 1.2em; color: #d9534f; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h2>🍎 卡路里紀錄</h2>
-    
+
     <div class="input-group">
-        <label>食物名稱 (試吓打「白飯」)</label>
-        <input type="text" id="foodName" list="foodList" oninput="autoFillCalorie()" placeholder="輸入食物名稱...">
+        <label>食物名稱 (試打「譚仔」或「雞」)</label>
+        <input type="text" id="foodName" list="foodList" oninput="checkFoodValue()" placeholder="輸入食物名稱...">
         <datalist id="foodList"></datalist>
     </div>
 
@@ -41,47 +39,52 @@
 
     <button class="btn-add" onclick="addEntry()">加入今日清單</button>
 
-    <div class="btn-group">
-        <button class="btn-export" onclick="window.location.href='/export'">匯出 (Out)</button>
-        <button class="btn-import" onclick="document.getElementById('fileInput').click()">匯入 (In)</button>
-        <input type="file" id="fileInput" style="display:none" onchange="importFile(this)">
+    <div style="display: flex; justify-content: space-between;">
+        <button class="btn-sync" onclick="window.location.href='/export'">匯出 (Out)</button>
+        <button class="btn-sync" style="background-color: #6c757d;" onclick="document.getElementById('importFile').click()">匯入 (In)</button>
+        <input type="file" id="importFile" style="display:none" onchange="importData(this)">
     </div>
 
-    <table id="recordTable">
-        <thead>
-            <tr><th>食物</th><th>卡路里</th></tr>
-        </thead>
-        <tbody></tbody>
-    </table>
-
-    <div class="total-section">
-        總計: <span id="totalCal">0</span> kcal
+    <div class="table-container">
+        <table>
+            <thead><tr><th>食物</th><th>卡路里</th></tr></thead>
+            <tbody id="recordBody"></tbody>
+        </table>
+        <div class="total-section">總計: <span id="totalCal">0</span> kcal</div>
     </div>
 </div>
 
 <script>
-    let foodLib = [];
+    let foodLibrary = [];
 
-    // 1. 初始化：獲取大數據食物清單
+    // 1. 初始化：從 API 載入 200+ 條食物數據
     async function loadLibrary() {
         try {
             const res = await fetch('/get_food_library');
-            foodLib = await res.json();
-            const datalist = document.getElementById('foodList');
-            datalist.innerHTML = foodLib.map(f => `<option value="${f.name}">`).join('');
-        } catch (e) { console.log("無法加載食物庫"); }
-    }
-
-    // 2. 自動填寫邏輯
-    function autoFillCalorie() {
-        const inputName = document.getElementById('foodName').value;
-        const match = foodLib.find(f => f.name === inputName);
-        if (match) {
-            document.getElementById('calories').value = match.cal;
+            foodLibrary = await res.json();
+            const list = document.getElementById('foodList');
+            list.innerHTML = "";
+            foodLibrary.forEach(item => {
+                let option = document.createElement('option');
+                option.value = item.name;
+                list.appendChild(option);
+            });
+            console.log("資料庫已載入，共 " + foodLibrary.length + " 條紀錄");
+        } catch (e) {
+            console.error("載入失敗:", e);
         }
     }
 
-    // 3. 新增紀錄到後端
+    // 2. 當用戶選擇食物時，自動填寫卡路里
+    function checkFoodValue() {
+        const val = document.getElementById('foodName').value;
+        const found = foodLibrary.find(f => f.name === val);
+        if (found) {
+            document.getElementById('calories').value = found.cal;
+        }
+    }
+
+    // 3. 新增紀錄
     async function addEntry() {
         const name = document.getElementById('foodName').value;
         const cal = document.getElementById('calories').value;
@@ -93,44 +96,36 @@
             body: JSON.stringify({ name, cal: parseInt(cal) })
         });
 
-        document.getElementById('foodName').value = '';
-        document.getElementById('calories').value = '';
-        loadUserRecords();
+        document.getElementById('foodName').value = "";
+        document.getElementById('calories').value = "";
+        loadRecords();
     }
 
-    // 4. 加載用戶個人紀錄
-    async function loadUserRecords() {
+    // 4. 顯示今日紀錄
+    async function loadRecords() {
         const res = await fetch('/get_records');
         const data = await res.json();
-        const tbody = document.querySelector('#recordTable tbody');
+        const body = document.getElementById('recordBody');
         let total = 0;
-
-        tbody.innerHTML = data.map(r => {
+        body.innerHTML = data.map(r => {
             total += parseInt(r.cal);
-            return `<tr><td>${r.name}</td><td>${r.cal} kcal</td></tr>`;
-        }).reverse().join(''); // 最新的排上面
-
+            return `<tr><td>${r.name}</td><td>${r.cal}</td></tr>`;
+        }).join('');
         document.getElementById('totalCal').innerText = total;
     }
 
     // 5. 匯入功能
-    async function importFile(input) {
-        if (!input.files[0]) return;
+    async function importData(input) {
         const formData = new FormData();
         formData.append('file', input.files[0]);
-
-        const res = await fetch('/import', { method: 'POST', body: formData });
-        if (res.ok) {
-            alert("數據匯入成功！");
-            loadUserRecords();
-        } else {
-            alert("匯入失敗，請檢查檔案格式");
-        }
+        await fetch('/import', { method: 'POST', body: formData });
+        loadRecords();
+        alert('匯入成功！');
     }
 
-    // 啟動
+    // 啟動載入
     loadLibrary();
-    loadUserRecords();
+    loadRecords();
 </script>
 
 </body>
