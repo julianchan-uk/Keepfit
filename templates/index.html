@@ -3,90 +3,105 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>卡路里隨身記</title>
+    <title>KeepFit 卡路里紀錄</title>
     <style>
-        body { font-family: -apple-system, sans-serif; background: #f4f7f6; padding: 20px; color: #333; }
-        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h2 { text-align: center; color: #2c3e50; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
-        button { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; transition: 0.3s; margin-top: 5px; }
-        .btn-add { background: #27ae60; color: white; }
-        .btn-add:hover { background: #219150; }
-        .btn-group { display: flex; gap: 10px; margin-top: 20px; }
-        .btn-tool { background: #3498db; color: white; flex: 1; font-size: 14px; }
+        body { font-family: -apple-system, sans-serif; background: #f4f7f6; display: flex; justify-content: center; padding: 20px; }
+        .container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 450px; }
+        h2 { text-align: center; color: #333; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        .btn-group { display: flex; gap: 10px; margin-top: 10px; }
+        button { flex: 1; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .btn-add { background: #28a745; color: white; width: 100%; margin-bottom: 10px; }
+        .btn-io { background: #17a2b8; color: white; font-size: 0.9em; }
         table { width: 100%; margin-top: 20px; border-collapse: collapse; }
         th, td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; }
-        .total { font-weight: bold; color: #e74c3c; margin-top: 15px; text-align: right; }
+        .total { text-align: right; font-size: 1.2em; color: #d9534f; font-weight: bold; margin-top: 15px; }
+        #suggestions { position: absolute; background: white; border: 1px solid #ddd; width: 390px; display: none; z-index: 100; }
+        .sug-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; }
+        .sug-item:hover { background: #f0f0f0; }
     </style>
 </head>
 <body>
-
-<div class="container">
-    <h2>🍎 卡路里紀錄</h2>
-    
-    <input type="text" id="foodName" placeholder="食物名稱 (例如: 白飯)" oninput="autoFill()">
-    <input type="number" id="calories" placeholder="卡路里 (kcal)">
-    <button class="btn-add" onclick="addEntry()">加入今日清單</button>
-
-    <div class="btn-group">
-        <button class="btn-tool" onclick="window.location.href='/api/export'">匯出 (Out)</button>
-        <button class="btn-tool" onclick="document.getElementById('fileInput').click()">匯入 (In)</button>
-    </div>
-    <input type="file" id="fileInput" style="display:none" onchange="handleImport(this)">
-
-    <table>
-        <thead><tr><th>食物</th><th>卡路里</th></tr></thead>
-        <tbody id="recordBody"></tbody>
-    </table>
-    <div class="total" id="totalCal">總計: 0 kcal</div>
-</div>
-
-<script>
-    async function autoFill() {
-        const name = document.getElementById('foodName').value;
-        if (!name) return;
-        const res = await fetch(`/api/search?name=${name}`);
-        const data = await res.json();
-        if (data.calories > 0) document.getElementById('calories').value = data.calories;
-    }
-
-    async function addEntry() {
-        const name = document.getElementById('foodName').value;
-        const cal = parseInt(document.getElementById('calories').value);
-        if (!name || !cal) return alert("請填寫資料");
-
-        await fetch('/api/add', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ name, cal, date: new Date().toLocaleDateString() })
-        });
+    <div class="container">
+        <h2>🍎 卡路里紀錄</h2>
         
-        document.getElementById('foodName').value = '';
-        document.getElementById('calories').value = '';
-        loadData();
-    }
+        <div style="position: relative;">
+            <input type="text" id="foodName" placeholder="搜尋食物名稱..." oninput="searchFood()">
+            <div id="suggestions"></div>
+        </div>
+        <input type="number" id="calories" placeholder="卡路里 (kcal)">
+        <button class="btn-add" onclick="addRecord()">加入今日清單</button>
 
-    async function loadData() {
-        const res = await fetch('/api/records');
-        const data = await res.json();
-        const tbody = document.getElementById('recordBody');
-        let total = 0;
-        tbody.innerHTML = data.map(r => {
-            total += r.cal;
-            return `<tr><td>${r.name}</td><td>${r.cal}</td></tr>`;
-        }).join('');
-        document.getElementById('totalCal').innerText = `總計: ${total} kcal`;
-    }
+        <div class="btn-group">
+            <button class="btn-io" onclick="location.href='/export'">匯出 (Out)</button>
+            <button class="btn-io" onclick="document.getElementById('fileIn').click()">匯入 (In)</button>
+            <input type="file" id="fileIn" style="display:none" onchange="importData(this)">
+        </div>
 
-    async function handleImport(input) {
-        const formData = new FormData();
-        formData.append('file', input.files[0]);
-        await fetch('/api/import', { method: 'POST', body: formData });
-        loadData();
-    }
+        <table id="recordTable">
+            <thead><tr><th>食物</th><th>卡路里</th></tr></thead>
+            <tbody></tbody>
+        </table>
+        <div class="total" id="totalCal">總計: 0 kcal</div>
+    </div>
 
-    loadData();
-</script>
+    <script>
+        async function searchFood() {
+            const q = document.getElementById('foodName').value;
+            const sugBox = document.getElementById('suggestions');
+            if (q.length < 1) { sugBox.style.display = 'none'; return; }
+            
+            const res = await fetch(`/search_lib?q=${q}`);
+            const data = await res.json();
+            
+            if (data.length > 0) {
+                sugBox.innerHTML = data.map(i => `<div class="sug-item" onclick="selectFood('${i.name}', ${i.cal})">${i.name} (${i.cal} kcal)</div>`).join('');
+                sugBox.style.display = 'block';
+            } else {
+                sugBox.style.display = 'none';
+            }
+        }
 
+        function selectFood(name, cal) {
+            document.getElementById('foodName').value = name;
+            document.getElementById('calories').value = cal;
+            document.getElementById('suggestions').style.display = 'none';
+        }
+
+        async function addRecord() {
+            const name = document.getElementById('foodName').value;
+            const cal = parseInt(document.getElementById('calories').value);
+            if (!name || !cal) return;
+            await fetch('/add_record', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name, cal})
+            });
+            document.getElementById('foodName').value = '';
+            document.getElementById('calories').value = '';
+            loadRecords();
+        }
+
+        async function loadRecords() {
+            const res = await fetch('/get_records');
+            const data = await res.json();
+            const tbody = document.querySelector('#recordTable tbody');
+            let total = 0;
+            tbody.innerHTML = data.map(r => {
+                total += r.cal;
+                return `<tr><td>${r.name}</td><td>${r.cal}</td></tr>`;
+            }).join('');
+            document.getElementById('totalCal').innerText = `總計: ${total} kcal`;
+        }
+
+        async function importData(input) {
+            const fd = new FormData();
+            fd.append('file', input.files[0]);
+            await fetch('/import', { method: 'POST', body: fd });
+            loadRecords();
+        }
+
+        loadRecords();
+    </script>
 </body>
 </html>
