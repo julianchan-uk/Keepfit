@@ -3,47 +3,41 @@ import json
 import os
 
 app = Flask(__name__)
-RECORDS_FILE = 'my_records.json'
-FOOD_DB = 'foods.json'
 
-# 初始化紀錄檔案
-if not os.path.exists(RECORDS_FILE):
-    with open(RECORDS_FILE, 'w', encoding='utf-8') as f:
+# 紀錄檔案路徑
+DATA_FILE = 'my_records.json'
+
+# 確保紀錄檔案存在
+if not os.path.exists(DATA_FILE):
+    with open(DATA_FILE, 'w', encoding='utf-8') as f:
         json.dump([], f)
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# 讓網頁讀取那 200 條食物數據
-@app.route('/get_food_library')
-def get_food_library():
-    if os.path.exists(FOOD_DB):
-        with open(FOOD_DB, 'r', encoding='utf-8') as f:
-            return jsonify(json.load(f))
-    return jsonify([])
-
-# 獲取今日已紀錄的數據
+# 獲取已儲存的紀錄
 @app.route('/get_records')
 def get_records():
-    with open(RECORDS_FILE, 'r', encoding='utf-8') as f:
+    with open(DATA_FILE, 'r', encoding='utf-8') as f:
         return jsonify(json.load(f))
 
-# 新增紀錄
+# 新增一條紀錄
 @app.route('/add_record', methods=['POST'])
 def add_record():
-    new_data = request.json
-    with open(RECORDS_FILE, 'r+', encoding='utf-8') as f:
+    record = request.json
+    with open(DATA_FILE, 'r+', encoding='utf-8') as f:
         data = json.load(f)
-        data.append(new_data)
+        data.append(record)
         f.seek(0)
         json.dump(data, f, ensure_ascii=False, indent=4)
     return "OK"
 
-# 匯出 (Export)
+# 匯出檔案
 @app.route('/export')
 def export_data():
-    return send_file(RECORDS_FILE, as_attachment=True)
+    return send_file(DATA_FILE, as_attachment=True)
 
 if __name__ == '__main__':
+    # 執行 App
     app.run(debug=True, port=5000)
