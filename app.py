@@ -3,55 +3,61 @@ import json
 import os
 
 app = Flask(__name__)
-DATA_FILE = 'my_records.json'
-LIB_FILE = 'foods.json'
 
-# 初始化紀錄檔
-if not os.path.exists(DATA_FILE):
-    with open(DATA_FILE, 'w', encoding='utf-8') as f:
-        json.dump([], f)
+# 檔案路徑設定
+RECORDS_FILE = 'my_records.json'
+FOOD_LIBRARY_FILE = 'foods.json'
+
+# 初始化：確保紀錄檔案存在
+def init_files():
+    if not os.path.exists(RECORDS_FILE):
+        with open(RECORDS_FILE, 'w', encoding='utf-8') as f:
+            json.dump([], f)
+    
+    # 如果食物庫唔存在，整一個基本版費事報錯
+    if not os.path.exists(FOOD_LIBRARY_FILE):
+        default_foods = [
+            {"name": "白飯 (一碗)", "cal": 260},
+            {"name": "雞蛋 (一隻)", "cal": 78},
+            {"name": "蘋果 (一個)", "cal": 52}
+        ]
+        with open(FOOD_LIBRARY_FILE, 'w', encoding='utf-8') as f:
+            json.dump(default_foods, f, ensure_ascii=False, indent=4)
+
+init_files()
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# 🔍 搜尋食物庫
-@app.route('/search_lib')
-def search_lib():
-    q = request.args.get('q', '').lower()
-    if not os.path.exists(LIB_FILE):
+# 1. 獲取大數據食物清單 (供前端下拉選單使用)
+@app.route('/get_food_library')
+def get_food_library():
+    try:
+        with open(FOOD_LIBRARY_FILE, 'r', encoding='utf-8') as f:
+            return jsonify(json.load(f))
+    except Exception as e:
         return jsonify([])
-    with open(LIB_FILE, 'r', encoding='utf-8') as f:
-        library = json.load(f)
-    # 搵出符合關鍵字嘅食物 (頭 10 個)
-    matches = [i for i in library if q in i['name'].lower()]
-    return jsonify(matches[:10])
 
+# 2. 獲取用戶自己嘅卡路里紀錄
 @app.route('/get_records')
 def get_records():
-    with open(DATA_FILE, 'r', encoding='utf-8') as f:
+    with open(RECORDS_FILE, 'r', encoding='utf-8') as f:
         return jsonify(json.load(f))
 
+# 3. 新增一條紀錄
 @app.route('/add_record', methods=['POST'])
 def add_record():
-    new_data = request.json
-    with open(DATA_FILE, 'r+', encoding='utf-8') as f:
+    new_record = request.json
+    with open(RECORDS_FILE, 'r+', encoding='utf-8') as f:
         data = json.load(f)
-        data.append(new_data)
+        data.append(new_record)
         f.seek(0)
+        f.truncate() # 清除舊內容
         json.dump(data, f, ensure_ascii=False, indent=4)
-    return "OK"
+    return "Success"
 
+# 4. 匯出 (Export)
 @app.route('/export')
-def export():
-    return send_file(DATA_FILE, as_attachment=True)
-
-@app.route('/import', methods=['POST'])
-def import_data():
-    file = request.files['file']
-    if file:
-        file.save(DATA_FILE)
-    return "OK"
-
-if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+def export_data():
+    return send_file(RECORDS_FILE, as_attachment
