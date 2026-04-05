@@ -1,73 +1,61 @@
 import streamlit as st
 import pandas as pd
-import json
 from datetime import datetime
+import io
 
-# 設定網頁標題
-st.set_page_config(page_title="Julian's Calorie Tracker", layout="centered")
+# 1. 網頁基本設定
+st.set_page_config(
+    page_title="Julian's Calorie Tracker",
+    page_icon="🍎",
+    layout="centered"
+)
+
+# 自定義 CSS 令介面更美觀
+st.markdown("""
+    <style>
+    .main {
+        background-color: #f5f7f9;
+    }
+    .stMetric {
+        background-color: #ffffff;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    </style>
+    """, unsafe_allow_value=True)
 
 st.title("🍎 卡路里紀錄儀 (Streamlit 版)")
 
-# 初始化 Session State (用嚟暫存數據，費事重新整理就消失)
+# 2. 初始化數據儲存 (Session State)
 if 'records' not in st.session_state:
     st.session_state.records = []
 
-# --- 側邊欄：匯入 / 匯出 ---
-st.sidebar.header("數據管理")
-
-# 匯出功能
-if st.session_state.records:
-    df_export = pd.DataFrame(st.session_state.records)
-    csv = df_export.to_csv(index=False).encode('utf-8')
-    st.sidebar.download_button(
-        label="📥 匯出 CSV 備份",
-        data=csv,
-        file_name=f"calories_{datetime.now().strftime('%Y%m%d')}.csv",
-        mime='text/csv',
-    )
-
-# 匯入功能
-uploaded_file = st.sidebar.file_input("📤 匯入 CSV 檔案", type="csv")
-if uploaded_file is not None:
-    imported_df = pd.read_csv(uploaded_file)
-    st.session_state.records = imported_df.to_dict('records')
-    st.sidebar.success("匯入成功！")
-
-# --- 主要介面：新增紀錄 ---
-with st.form("add_form", clear_on_submit=True):
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        food = st.text_input("食物名稱", placeholder="例如：雞胸肉")
-    with col2:
-        cal = st.number_input("卡路里 (kcal)", min_value=0, step=1)
+# --- 側邊欄：數據管理 (Import/Export) ---
+with st.sidebar:
+    st.header("⚙️ 數據管理")
     
-    submit = st.form_submit_button("新增紀錄")
-    if submit and food:
-        new_record = {"時間": datetime.now().strftime("%H:%M"), "食物": food, "卡路里": cal}
-        st.session_state.records.append(new_record)
-        st.rerun()
+    # 匯出功能 (Export)
+    if st.session_state.records:
+        df_for_export = pd.DataFrame(st.session_state.records)
+        csv_data = df_for_export.to_csv(index=False).encode('utf-8-sig') # 支援中文
+        
+        st.download_button(
+            label="📥 匯出 CSV 備份",
+            data=csv_data,
+            file_name=f"calories_{datetime.now().strftime('%Y%m%d')}.csv",
+            mime='text/csv',
+        )
+    else:
+        st.write("暫時冇數據可以匯出")
 
-# --- 顯示數據 ---
-if st.session_state.records:
-    df = pd.DataFrame(st.session_state.records)
+    st.divider()
+
+    # 匯入功能 (Import) - 修正後的正確 Function: file_uploader
+    uploaded_file = st.file_uploader("📤 匯入 CSV 檔案", type="csv")
     
-    # 顯示總計數值
-    total_cal = df['卡路里'].sum()
-    st.metric(label="今日總攝取", value=f"{total_cal} kcal")
-    
-    # 顯示表格
-    st.subheader("今日清單")
-    st.dataframe(df, use_container_width=True)
-
-    # 簡單圖表分析
-    st.subheader("比例分析")
-    st.bar_chart(df.set_index('食物')['卡路里'])
-
-    if st.button("🗑️ 清空所有紀錄"):
-        st.session_state.records = []
-        st.rerun()
-else:
-    st.info("目前仲未有紀錄，開始輸入你第一餐啦！")
-
-st.divider()
-st.caption("Developed by julianchan-uk | Powered by Streamlit")
+    if uploaded_file is not None:
+        try:
+            # 讀取上傳的 CSV
+            imported_df = pd.read_csv(uploaded_file)
+            #
