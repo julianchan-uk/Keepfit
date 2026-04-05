@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>卡路里隨身記</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f4f7f6; padding: 20px; color: #333; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #2c3e50; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; transition: 0.3s; margin-top: 5px; }
+        .btn-add { background: #27ae60; color: white; }
+        .btn-add:hover { background: #219150; }
+        .btn-group { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-tool { background: #3498db; color: white; flex: 1; font-size: 14px; }
+        table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; }
+        .total { font-weight: bold; color: #e74c3c; margin-top: 15px; text-align: right; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🍎 卡路里紀錄</h2>
+    
+    <input type="text" id="foodName" placeholder="食物名稱 (例如: 白飯)" oninput="autoFill()">
+    <input type="number" id="calories" placeholder="卡路里 (kcal)">
+    <button class="btn-add" onclick="addEntry()">加入今日清單</button>
+
+    <div class="btn-group">
+        <button class="btn-tool" onclick="window.location.href='/api/export'">匯出 (Out)</button>
+        <button class="btn-tool" onclick="document.getElementById('fileInput').click()">匯入 (In)</button>
+    </div>
+    <input type="file" id="fileInput" style="display:none" onchange="handleImport(this)">
+
+    <table>
+        <thead><tr><th>食物</th><th>卡路里</th></tr></thead>
+        <tbody id="recordBody"></tbody>
+    </table>
+    <div class="total" id="totalCal">總計: 0 kcal</div>
+</div>
+
+<script>
+    async function autoFill() {
+        const name = document.getElementById('foodName').value;
+        if (!name) return;
+        const res = await fetch(`/api/search?name=${name}`);
+        const data = await res.json();
+        if (data.calories > 0) document.getElementById('calories').value = data.calories;
+    }
+
+    async function addEntry() {
+        const name = document.getElementById('foodName').value;
+        const cal = parseInt(document.getElementById('calories').value);
+        if (!name || !cal) return alert("請填寫資料");
+
+        await fetch('/api/add', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ name, cal, date: new Date().toLocaleDateString() })
+        });
+        
+        document.getElementById('foodName').value = '';
+        document.getElementById('calories').value = '';
+        loadData();
+    }
+
+    async function loadData() {
+        const res = await fetch('/api/records');
+        const data = await res.json();
+        const tbody = document.getElementById('recordBody');
+        let total = 0;
+        tbody.innerHTML = data.map(r => {
+            total += r.cal;
+            return `<tr><td>${r.name}</td><td>${r.cal}</td></tr>`;
+        }).join('');
+        document.getElementById('totalCal').innerText = `總計: ${total} kcal`;
+    }
+
+    async function handleImport(input) {
+        const formData = new FormData();
+        formData.append('file', input.files[0]);
+        await fetch('/api/import', { method: 'POST', body: formData });
+        loadData();
+    }
+
+    loadData();
+</script>
+
+</body>
+</html>
