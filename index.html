@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <title>我的卡路里紀錄儀</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 0 20px; line-height: 1.6; }
+        .card { border: 1px solid #ddd; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .input-group { margin-bottom: 10px; }
+        input { padding: 8px; margin-right: 5px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 8px 15px; cursor: pointer; background: #28a745; color: white; border: none; border-radius: 4px; }
+        button.export { background: #007bff; }
+        button.import-btn { background: #6c757d; }
+        button.clear { background: #dc3545; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border-bottom: 1px solid #ddd; padding: 10px; text-align: left; }
+        .total { font-size: 1.2em; font-weight: bold; color: #d9534f; margin-top: 15px; }
+        .actions { margin-top: 20px; display: flex; gap: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>🍎 卡路里計算器</h2>
+    
+    <div class="input-group">
+        <input type="text" id="foodName" placeholder="食物名稱 (例如：雞蛋)">
+        <input type="number" id="calories" placeholder="卡路里">
+        <button onclick="addEntry()">新增</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>食物</th>
+                <th>卡路里</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody id="recordTable"></tbody>
+    </table>
+
+    <div class="total">今日總計：<span id="totalCal">0</span> kcal</div>
+
+    <div class="actions">
+        <button class="export" onclick="exportJSON()">匯出 JSON</button>
+        <button class="import-btn" onclick="document.getElementById('fileInput').click()">匯入 JSON</button>
+        <input type="file" id="fileInput" style="display:none" onchange="importJSON(event)">
+        <button class="clear" onclick="clearAll()">清空全部</button>
+    </div>
+</div>
+
+<script>
+    let records = JSON.parse(localStorage.getItem('calRecords')) || [];
+
+    function updateUI() {
+        const tableBody = document.getElementById('recordTable');
+        const totalSpan = document.getElementById('totalCal');
+        tableBody.innerHTML = '';
+        let total = 0;
+
+        records.forEach((item, index) => {
+            total += parseInt(item.cal);
+            tableBody.innerHTML += `
+                <tr>
+                    <td>${item.name}</td>
+                    <td>${item.cal} kcal</td>
+                    <td><button onclick="deleteEntry(${index})" style="background:#ffc107; color:black; padding:2px 5px;">刪除</button></td>
+                </tr>
+            `;
+        });
+
+        totalSpan.innerText = total;
+        localStorage.setItem('calRecords', JSON.stringify(records));
+    }
+
+    function addEntry() {
+        const name = document.getElementById('foodName').value;
+        const cal = document.getElementById('calories').value;
+        
+        if(name && cal) {
+            records.push({ name, cal: parseInt(cal) });
+            document.getElementById('foodName').value = '';
+            document.getElementById('calories').value = '';
+            updateUI();
+        }
+    }
+
+    function deleteEntry(index) {
+        records.splice(index, 1);
+        updateUI();
+    }
+
+    function clearAll() {
+        if(confirm('確定要清空所有紀錄嗎？')) {
+            records = [];
+            updateUI();
+        }
+    }
+
+    // --- 匯出功能 ---
+    function exportJSON() {
+        const dataStr = JSON.stringify(records, null, 2);
+        const blob = new Blob([dataStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `calories_${new Date().toLocaleDateString()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    // --- 匯入功能 ---
+    function importJSON(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                if (Array.isArray(importedData)) {
+                    records = importedData;
+                    updateUI();
+                    alert('匯入成功！');
+                }
+            } catch (err) {
+                alert('檔案格式錯誤！');
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    // 初始化顯示
+    updateUI();
+</script>
+
+</body>
+</html>
