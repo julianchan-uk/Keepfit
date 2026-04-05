@@ -5,39 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Keepfit 卡路里紀錄</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f9; display: flex; justify-content: center; padding: 20px; }
-        .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 450px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f9; padding: 20px; display: flex; justify-content: center; }
+        .container { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 500px; }
         h2 { text-align: center; color: #333; }
-        label { display: block; margin-top: 15px; font-weight: bold; color: #555; }
-        select, input { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        label { display: block; margin: 15px 0 5px; font-weight: bold; color: #555; }
+        select, input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
         button { width: 100%; padding: 12px; margin-top: 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.3s; }
         .btn-add { background-color: #4CAF50; color: white; }
         .btn-add:hover { background-color: #45a049; }
         .btn-group { display: flex; gap: 10px; margin-top: 10px; }
-        .btn-secondary { background-color: #17a2b8; color: white; flex: 1; }
+        .btn-sec { background-color: #5bc0de; color: white; flex: 1; }
         table { width: 100%; margin-top: 25px; border-collapse: collapse; }
         th, td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; }
-        .total { text-align: right; font-weight: bold; color: #d9534f; font-size: 1.2em; margin-top: 15px; }
+        .total { text-align: right; font-weight: bold; color: #d9534f; font-size: 1.2em; margin-top: 20px; }
     </style>
 </head>
 <body>
 
-<div class="card">
+<div class="container">
     <h2>🍎 卡路里紀錄</h2>
 
     <label>選擇食物 (200+ 數據)：</label>
-    <select id="foodSelect" onchange="syncCalorie()">
+    <select id="foodSelect" onchange="fillCal()">
         <option value="">-- 請選擇食物 --</option>
     </select>
 
     <label>卡路里 (kcal)：</label>
-    <input type="number" id="calories" placeholder="揀選後自動填入">
+    <input type="number" id="calories" placeholder="手動修改或自動填入">
 
     <button class="btn-add" onclick="addEntry()">加入今日清單</button>
 
     <div class="btn-group">
-        <button class="btn-secondary" onclick="window.location.href='/export'">匯出 (Out)</button>
-        <button class="btn-secondary" style="background-color: #6c757d;" onclick="alert('請手動將檔案放入 OMV 或上傳')">匯入 (In)</button>
+        <button class="btn-sec" onclick="location.href='/export'">匯出 (Out)</button>
+        <button class="btn-sec" style="background:#666">匯入 (In)</button>
     </div>
 
     <table id="recordTable">
@@ -47,62 +47,60 @@
         <tbody></tbody>
     </table>
 
-    <div class="total" id="totalCal">總計: 0 kcal</div>
+    <div class="total" id="totalDisplay">總計: 0 kcal</div>
 </div>
 
 <script>
-    let library = [];
+    // 這裡直接放入你的 200 條食物數據包
+    const foodLibrary = [
+        {"name": "白飯 (一碗/200g)", "cal": 260}, {"name": "糙米飯", "cal": 220}, {"name": "白粥", "cal": 140},
+        {"name": "餐蛋麵", "cal": 680}, {"name": "沙嗲牛肉麵", "cal": 600}, {"name": "雲吞麵", "cal": 320},
+        {"name": "乾炒牛河", "cal": 840}, {"name": "星洲炒米", "cal": 550}, {"name": "叉燒飯", "cal": 650},
+        {"name": "切雞飯", "cal": 700}, {"name": "菠蘿包", "cal": 350}, {"name": "西多士", "cal": 520},
+        {"name": "燒賣 (5粒)", "cal": 210}, {"name": "蝦餃 (4粒)", "cal": 180}, {"name": "魚蛋 (5粒)", "cal": 80},
+        {"name": "譚仔米線 (清湯)", "cal": 350}, {"name": "麥當勞巨無霸", "cal": 500}, {"name": "薯條 (中)", "cal": 310},
+        {"name": "雞蛋 (一隻)", "cal": 78}, {"name": "雞胸肉 (100g)", "cal": 165}, {"name": "蘋果", "cal": 52},
+        {"name": "香蕉", "cal": 90}, {"name": "可樂 (330ml)", "cal": 140}, {"name": "零系可樂", "cal": 0}
+        // ... 你可以繼續在此貼入其餘 200 條數據
+    ];
 
-    // 1. 初始化：讀取食物資料庫
-    fetch('/get_food_library')
-        .then(res => res.json())
-        .then(data => {
-            library = data;
-            const select = document.getElementById('foodSelect');
-            data.forEach(item => {
-                let opt = document.createElement('option');
-                opt.value = item.name;
-                opt.textContent = `${item.name} (${item.cal} kcal)`;
-                select.appendChild(opt);
-            });
-        });
+    // 初始化下拉選單
+    const select = document.getElementById('foodSelect');
+    foodLibrary.sort((a, b) => a.name.localeCompare(b.name, 'zh-HK')).forEach(item => {
+        let opt = document.createElement('option');
+        opt.value = item.name;
+        opt.textContent = `${item.name} (${item.cal} kcal)`;
+        select.appendChild(opt);
+    });
 
-    // 2. 當選單改變，自動填寫卡路里
-    function syncCalorie() {
-        const selected = document.getElementById('foodSelect').value;
-        const item = library.find(f => f.name === selected);
-        document.getElementById('calories').value = item ? item.cal : "";
+    function fillCal() {
+        const selected = foodLibrary.find(f => f.name === select.value);
+        document.getElementById('calories').value = selected ? selected.cal : "";
     }
 
-    // 3. 新增紀錄到後端
     async function addEntry() {
-        const name = document.getElementById('foodSelect').value || "手動輸入";
+        const name = select.value || "自定義食物";
         const cal = document.getElementById('calories').value;
         if(!cal) return alert("請輸入卡路里");
 
         await fetch('/add_record', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ name, cal: parseInt(cal) })
+            body: JSON.stringify({name, cal: parseInt(cal)})
         });
-        
         loadRecords();
-        document.getElementById('calories').value = "";
     }
 
-    // 4. 讀取並顯示列表
     async function loadRecords() {
         const res = await fetch('/get_records');
         const data = await res.json();
         const tbody = document.querySelector('#recordTable tbody');
         let total = 0;
-        
         tbody.innerHTML = data.map(r => {
             total += parseInt(r.cal);
             return `<tr><td>${r.name}</td><td>${r.cal} kcal</td></tr>`;
         }).join('');
-        
-        document.getElementById('totalCal').innerText = `總計: ${total} kcal`;
+        document.getElementById('totalDisplay').textContent = `總計: ${total} kcal`;
     }
 
     loadRecords();
