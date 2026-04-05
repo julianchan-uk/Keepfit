@@ -15,14 +15,16 @@ if not os.path.exists(DATA_FILE):
 def index():
     return render_template('index.html')
 
-# 搜尋食物庫 (大數據攝取)
+# 🔍 搜尋食物庫
 @app.route('/search_lib')
 def search_lib():
-    query = request.args.get('q', '').lower()
-    if not os.path.exists(LIB_FILE): return jsonify([])
+    q = request.args.get('q', '').lower()
+    if not os.path.exists(LIB_FILE):
+        return jsonify([])
     with open(LIB_FILE, 'r', encoding='utf-8') as f:
-        lib = json.load(f)
-    matches = [i for i in lib if query in i['name'].lower()]
+        library = json.load(f)
+    # 搵出符合關鍵字嘅食物 (頭 10 個)
+    matches = [i for i in library if q in i['name'].lower()]
     return jsonify(matches[:10])
 
 @app.route('/get_records')
@@ -37,22 +39,19 @@ def add_record():
         data = json.load(f)
         data.append(new_data)
         f.seek(0)
-        f.truncate()
         json.dump(data, f, ensure_ascii=False, indent=4)
     return "OK"
 
 @app.route('/export')
-def export_data():
+def export():
     return send_file(DATA_FILE, as_attachment=True)
 
 @app.route('/import', methods=['POST'])
 def import_data():
     file = request.files['file']
     if file:
-        content = json.load(file)
-        with open(DATA_FILE, 'w', encoding='utf-8') as f:
-            json.dump(content, f, ensure_ascii=False, indent=4)
-    return "Success"
+        file.save(DATA_FILE)
+    return "OK"
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
