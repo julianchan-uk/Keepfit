@@ -4,60 +4,53 @@ import os
 
 app = Flask(__name__)
 
-# 檔案路徑設定
+# 設定檔案路徑
 RECORDS_FILE = 'my_records.json'
 FOOD_LIBRARY_FILE = 'foods.json'
 
-# 初始化：確保紀錄檔案存在
+# --- 初始化功能：確保必要的 JSON 檔案存在 ---
 def init_files():
+    # 1. 確保用戶紀錄檔案存在
     if not os.path.exists(RECORDS_FILE):
         with open(RECORDS_FILE, 'w', encoding='utf-8') as f:
             json.dump([], f)
     
-    # 如果食物庫唔存在，整一個基本版費事報錯
+    # 2. 確保食物數據庫存在，如果冇就整一個基本清單
     if not os.path.exists(FOOD_LIBRARY_FILE):
         default_foods = [
             {"name": "白飯 (一碗)", "cal": 260},
+            {"name": "餐蛋麵", "cal": 680},
+            {"name": "雲吞麵", "cal": 320},
+            {"name": "叉燒飯", "cal": 600},
+            {"name": "菠蘿包", "cal": 350},
+            {"name": "燒賣 (5粒)", "cal": 210},
+            {"name": "蝦餃 (4粒)", "cal": 180},
+            {"name": "凍奶茶", "cal": 190},
             {"name": "雞蛋 (一隻)", "cal": 78},
-            {"name": "蘋果 (一個)", "cal": 52}
+            {"name": "蘋果", "cal": 52}
         ]
         with open(FOOD_LIBRARY_FILE, 'w', encoding='utf-8') as f:
             json.dump(default_foods, f, ensure_ascii=False, indent=4)
 
+# 執行初始化
 init_files()
+
+# --- 路由設定 (Routes) ---
 
 @app.route('/')
 def index():
+    """顯示主網頁"""
     return render_template('index.html')
 
-# 1. 獲取大數據食物清單 (供前端下拉選單使用)
 @app.route('/get_food_library')
 def get_food_library():
+    """回傳食物大數據清單"""
     try:
         with open(FOOD_LIBRARY_FILE, 'r', encoding='utf-8') as f:
             return jsonify(json.load(f))
     except Exception as e:
         return jsonify([])
 
-# 2. 獲取用戶自己嘅卡路里紀錄
 @app.route('/get_records')
 def get_records():
-    with open(RECORDS_FILE, 'r', encoding='utf-8') as f:
-        return jsonify(json.load(f))
-
-# 3. 新增一條紀錄
-@app.route('/add_record', methods=['POST'])
-def add_record():
-    new_record = request.json
-    with open(RECORDS_FILE, 'r+', encoding='utf-8') as f:
-        data = json.load(f)
-        data.append(new_record)
-        f.seek(0)
-        f.truncate() # 清除舊內容
-        json.dump(data, f, ensure_ascii=False, indent=4)
-    return "Success"
-
-# 4. 匯出 (Export)
-@app.route('/export')
-def export_data():
-    return send_file(RECORDS_FILE, as_attachment
+    """獲
